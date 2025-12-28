@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fruit Smash Game</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #020205;
+            --panel: rgba(10, 10, 25, 0.9);
+            --neon-blue: #00d2ff;
+            --neon-pink: #ff007f;
+            --neon-green: #39ff14;
+            --neon-purple: #bc13fe;
+            --text: #e0e0ff;
+            --grid-size: 8;
+            --tile-size: 45px;
+        }
+
+        body { 
+            background: var(--bg); color: var(--text); margin: 0; 
+            font-family: 'Rajdhani', sans-serif; 
+            overflow: hidden; display: flex; align-items: center; 
+            justify-content: center; height: 100vh;
+            background-image: 
+                linear-gradient(rgba(0, 210, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 210, 255, 0.05) 1px, transparent 1px);
+            background-size: 50px 50px;
+            animation: bgScroll 20s linear infinite;
+        }
+
+        @keyframes bgScroll { from { background-position: 0 0; } to { background-position: 50px 50px; } }
+
+        .screen { 
+            display: none; flex-direction: column; align-items: center; 
+            justify-content: center; width: 100%; height: 100%; position: absolute;
+            z-index: 10;
+        }
+        .active { display: flex; animation: neonFade 0.6s ease-in-out; }
+
+        @keyframes neonFade { from { opacity: 0; filter: hue-rotate(90deg) blur(10px); } to { opacity: 1; filter: hue-rotate(0deg) blur(0); } }
+
+        .box {
+            background: var(--panel); padding: 40px; border-radius: 30px;
+            border: 2px solid var(--neon-blue);
+            box-shadow: 0 0 30px rgba(0, 210, 255, 0.3), inset 0 0 20px rgba(0, 210, 255, 0.2);
+            text-align: center; width: 360px; position: relative;
+            backdrop-filter: blur(10px);
+        }
+
+        .btn {
+            font-family: 'Orbitron', sans-serif;
+            padding: 14px 28px; margin: 12px; border: 2px solid var(--neon-blue); 
+            border-radius: 12px; cursor: pointer; font-weight: bold; color: white;
+            background: rgba(0, 210, 255, 0.1); text-transform: uppercase;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            letter-spacing: 2px; text-shadow: 0 0 5px var(--neon-blue);
+        }
+        .btn:hover { 
+            background: var(--neon-blue); color: #000;
+            box-shadow: 0 0 40px var(--neon-blue); transform: scale(1.05) translateY(-3px);
+        }
+
+        .btn-back {
+            position: absolute; top: 20px; left: 20px; width: 45px; height: 45px;
+            border-radius: 50%; border: 2px solid var(--neon-blue);
+            background: transparent; color: var(--neon-blue); font-size: 22px;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 0 15px var(--neon-blue); transition: 0.4s;
+        }
+        .btn-back:hover { background: var(--neon-blue); color: #000; transform: rotate(-360deg); }
+
+        #level-map { 
+            display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; 
+            max-height: 400px; overflow-y: auto; padding: 15px; margin-top: 20px;
+            scrollbar-width: thin; scrollbar-color: var(--neon-blue) transparent;
+        }
+
+        .level-dot { 
+            width: 55px; height: 55px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.1);
+            color: white; font-weight: bold; cursor: pointer; transition: 0.3s;
+            background: rgba(255,255,255,0.03); font-family: 'Orbitron';
+        }
+        .unlocked { border-color: var(--neon-green); box-shadow: 0 0 15px var(--neon-green); color: var(--neon-green); }
+        .locked { opacity: 0.2; cursor: not-allowed; filter: grayscale(1); }
+
+        .grid-container {
+            padding: 10px; border: 4px solid var(--neon-blue); border-radius: 20px;
+            box-shadow: 0 0 40px rgba(0, 210, 255, 0.4); background: rgba(0,0,0,0.8);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(var(--grid-size), var(--tile-size));
+            grid-template-rows: repeat(var(--grid-size), var(--tile-size));
+            gap: 2px;
+        }
+
+        .tile { 
+            width: var(--tile-size); height: var(--tile-size); 
+            display: flex; justify-content: center; align-items: center; 
+            font-size: 30px; cursor: pointer; user-select: none;
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .tile:active { transform: scale(0.8); }
+        .tile.selected { background: rgba(0, 210, 255, 0.2); border-radius: 8px; box-shadow: inset 0 0 10px var(--neon-blue); }
+
+        .boom-effect {
+            position: absolute; pointer-events: none; color: var(--neon-pink);
+            font-weight: 900; font-size: 18px; text-shadow: 0 0 10px var(--neon-pink);
+            font-family: 'Orbitron'; z-index: 1000; animation: boomAnim 0.6s ease-out forwards;
+        }
+
+        @keyframes boomAnim {
+            0% { transform: scale(0.5); opacity: 1; }
+            100% { transform: scale(2.5) translateY(-30px); opacity: 0; }
+        }
+
+        .particle { position: absolute; pointer-events: none; border-radius: 50%; animation: partAni 0.7s forwards; }
+        @keyframes partAni { 100% { transform: translate(var(--dx), var(--dy)) scale(0); opacity: 0; } }
+
+        #stats-bar {
+            display: flex; justify-content: space-between; width: 380px;
+            margin-bottom: 20px; padding: 15px; background: var(--panel);
+            border-radius: 15px; border-bottom: 3px solid var(--neon-blue);
+            font-family: 'Orbitron'; font-size: 18px;
+        }
+
+        .modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95); z-index: 2000; justify-content: center; align-items: center;
+        }
+        .modal-content { 
+            background: var(--bg); padding: 50px; border-radius: 30px; 
+            text-align: center; border: 2px solid var(--neon-green);
+            box-shadow: 0 0 60px var(--neon-green);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="scr-lang" class="screen active">
+        <div class="box">
+            <h1 style="color:var(--neon-blue); font-family:'Orbitron'; font-size: 32px; text-shadow: 0 0 20px var(--neon-blue);">Fruit Smash</h1>
+            <button class="btn" onclick="setLang('az')">AZƏRBAYCAN</button>
+            <button class="btn" onclick="setLang('tr')">TÜRKÇE</button>
+            <button class="btn" onclick="setLang('en')">ENGLISH</button>
+            <button class="btn" onclick="setLang('ru')">РУССКИЙ</button>
+        </div>
+    </div>
+
+    <div id="scr-levels" class="screen">
+        <div class="box" style="width:420px">
+            <button class="btn-back" onclick="showScr('scr-lang')">←</button>
+            <h2 id="txt-levels" style="color:var(--neon-blue); font-family:'Orbitron'">LEVEL SECTOR</h2>
+            <div id="level-map"></div>
+            <button id="btn-reset" class="btn" style="border-color:var(--neon-pink); font-size:10px;" onclick="showResetModal()">WIPE MEMORY</button>
+        </div>
+    </div>
+
+    <div id="scr-game" class="screen">
+        <div id="stats-bar">
+            <div>LVL: <span id="txt-lvl" style="color:var(--neon-green)">1</span></div>
+            <div>GOAL: <span id="txt-target" style="color:var(--neon-pink)">0</span></div>
+            <div>SCORE: <span id="txt-score" style="color:var(--neon-blue)">0</span></div>
+        </div>
+        <div class="grid-container">
+            <div class="grid" id="grid"></div>
+        </div>
+        <p style="margin-top:20px; color:#444; font-size:12px; font-family:'Orbitron'">PRESS ESC TO ABORT MISSION</p>
+    </div>
+
+    <div id="mod-win" class="modal">
+        <div class="modal-content">
+            <h2 id="txt-win-title" style="font-family:'Orbitron'; color:var(--neon-green)">CORE OVERLOAD</h2>
+            <p id="txt-win-body" style="font-size:20px">System upgraded to next level.</p>
+            <button class="btn" onclick="closeWinModal()" id="btn-proceed">PROCEED</button>
+        </div>
+    </div>
+
+    <div id="mod-reset" class="modal">
+        <div class="modal-content" style="border-color:var(--neon-pink); box-shadow:0 0 60px var(--neon-pink)">
+            <h2 style="font-family:'Orbitron'; color:var(--neon-pink)">DANGER!</h2>
+            <p id="txt-reset-body">This will erase all neural progress. Confirm?</p>
+            <div style="display:flex; gap:20px; justify-content:center">
+                <button class="btn" style="border-color:var(--neon-pink)" onclick="confirmReset()">YES</button>
+                <button class="btn" onclick="hideResetModal()">NO</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const fruits = ['🍎', '🍊', '🍇', '🍓', '🍍', '🥝'];
+        const dict = {
+            az: { levels: "MƏRHƏLƏLƏR", win: "SİSTEM AŞILDI!", info: "Yeni sektor aktivdir.", reset: "YADDAŞI SİL", rBody: "Proqres tamamilə silinsin?", proceed: "DAVAM ET" },
+            tr: { levels: "SEVİYELER", win: "SİSTEM AŞILDI!", info: "Yeni sektör aktif.", reset: "BELLEĞİ SİL", rBody: "İlerleme tamamen silinsin mi?", proceed: "DEVAM ET" },
+            en: { levels: "SECTORS", win: "CORE OVERLOAD!", info: "Next sector activated.", reset: "WIPE MEMORY", rBody: "Erase all neural progress?", proceed: "PROCEED" },
+            ru: { levels: "СЕКТОРЫ", win: "СИСТЕМА ВЗЛОМАНА!", info: "Сектор активирован.", reset: "СТЕРЕТЬ ПАМЯТЬ", rBody: "Стереть весь прогресс?", proceed: "ПРОДОЛЖИТЬ" }
+        };
+
+        let state = {
+            lang: 'en',
+            score: 0,
+            target: 0,
+            lvl: 1,
+            unlocked: parseInt(localStorage.getItem('neon_pro_lvl')) || 1,
+            selected: null,
+            isProcessing: false,
+            audioCtx: null
+        };
+
+        function showScr(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if(e.key === 'Escape') {
+                if(document.getElementById('scr-game').classList.contains('active')) showScr('scr-levels');
+                else if(document.getElementById('scr-levels').classList.contains('active')) showScr('scr-lang');
+            }
+        });
+
+        function setLang(l) {
+            state.lang = l;
+            if(!state.audioCtx) state.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            document.getElementById('txt-levels').innerText = dict[l].levels;
+            document.getElementById('txt-win-title').innerText = dict[l].win;
+            document.getElementById('txt-win-body').innerText = dict[l].info;
+            document.getElementById('btn-reset').innerText = dict[l].reset;
+            document.getElementById('txt-reset-body').innerText = dict[l].rBody;
+            document.getElementById('btn-proceed').innerText = dict[l].proceed;
+            showScr('scr-levels');
+            renderMap();
+        }
+
+        function renderMap() {
+            const map = document.getElementById('level-map');
+            map.innerHTML = '';
+            state.unlocked = parseInt(localStorage.getItem('neon_pro_lvl')) || 1;
+            for(let i=1; i<=100; i++) {
+                const b = document.createElement('button');
+                b.className = `level-dot ${i <= state.unlocked ? 'unlocked' : 'locked'}`;
+                b.innerText = i;
+                if(i <= state.unlocked) b.onclick = () => startGame(i);
+                map.appendChild(b);
+            }
+        }
+
+        function startGame(l) {
+            state.lvl = l;
+            state.score = 0;
+            state.target = 500 + (l * 100);
+            document.getElementById('txt-lvl').innerText = l;
+            document.getElementById('txt-target').innerText = state.target;
+            document.getElementById('txt-score').innerText = 0;
+            showScr('scr-game');
+            initGrid();
+        }
+
+        function initGrid() {
+            const grid = document.getElementById('grid');
+            grid.innerHTML = '';
+            for(let i=0; i<64; i++) {
+                const tile = document.createElement('div');
+                tile.className = 'tile';
+                tile.id = `tile-${i}`;
+                tile.dataset.index = i;
+                tile.innerHTML = fruits[Math.floor(Math.random() * fruits.length)];
+                tile.onclick = () => handleTileClick(i);
+                grid.appendChild(tile);
+            }
+        }
+
+        function handleTileClick(idx) {
+            if(state.isProcessing) return;
+            const tile = document.getElementById(`tile-${idx}`);
+
+            if(state.selected === null) {
+                state.selected = idx;
+                tile.classList.add('selected');
+            } else {
+                const prevIdx = state.selected;
+                const prevTile = document.getElementById(`tile-${prevIdx}`);
+                
+                if(isAdjacent(prevIdx, idx)) {
+                    swapTiles(prevIdx, idx);
+                }
+                
+                prevTile.classList.remove('selected');
+                state.selected = null;
+            }
+        }
+
+        function isAdjacent(idx1, idx2) {
+            const r1 = Math.floor(idx1 / 8), c1 = idx1 % 8;
+            const r2 = Math.floor(idx2 / 8), c2 = idx2 % 8;
+            return (Math.abs(r1 - r2) + Math.abs(c1 - c2)) === 1;
+        }
+
+        async function swapTiles(i1, i2) {
+            state.isProcessing = true;
+            const t1 = document.getElementById(`tile-${i1}`);
+            const t2 = document.getElementById(`tile-${i2}`);
+            
+            const temp = t1.innerHTML;
+            t1.innerHTML = t2.innerHTML;
+            t2.innerHTML = temp;
+
+            if(!checkMatches()) {
+                await new Promise(r => setTimeout(r, 300));
+                t2.innerHTML = t1.innerHTML;
+                t1.innerHTML = temp;
+            }
+            state.isProcessing = false;
+        }
+
+        function checkMatches() {
+            let found = false;
+            const grid = Array.from(document.querySelectorAll('.tile')).map(t => t.innerHTML);
+            let toPop = new Set();
+
+            for(let i=0; i<64; i++) {
+                // Horizontal
+                if(i % 8 < 6 && grid[i] === grid[i+1] && grid[i] === grid[i+2]) {
+                    [i, i+1, i+2].forEach(n => toPop.add(n));
+                }
+                // Vertical
+                if(i < 48 && grid[i] === grid[i+8] && grid[i] === grid[i+16]) {
+                    [i, i+8, i+16].forEach(n => toPop.add(n));
+                }
+            }
+
+            if(toPop.size > 0) {
+                toPop.forEach(idx => popTile(idx));
+                state.score += toPop.size * 10;
+                document.getElementById('txt-score').innerText = state.score;
+                if(state.score >= state.target) winLevel();
+                return true;
+            }
+            return false;
+        }
+
+        function popTile(idx) {
+            const tile = document.getElementById(`tile-${idx}`);
+            const rect = tile.getBoundingClientRect();
+            
+            // BOOM Text
+            const boom = document.createElement('div');
+            boom.className = 'boom-effect';
+            boom.innerText = 'BOOM';
+            boom.style.left = (rect.left) + 'px';
+            boom.style.top = (rect.top) + 'px';
+            document.body.appendChild(boom);
+            setTimeout(() => boom.remove(), 600);
+
+            // Particles
+            for(let i=0; i<15; i++) {
+                const p = document.createElement('div');
+                p.className = 'particle';
+                p.style.cssText = `left:${rect.left+22}px; top:${rect.top+22}px; width:5px; height:5px; background:var(--neon-pink); box-shadow:0 0 10px var(--neon-pink);`;
+                p.style.setProperty('--dx', (Math.random()-0.5)*300 + 'px');
+                p.style.setProperty('--dy', (Math.random()-0.5)*300 + 'px');
+                document.body.appendChild(p);
+                setTimeout(() => p.remove(), 700);
+            }
+
+            // High-End Audio
+            if(state.audioCtx) {
+                const osc = state.audioCtx.createOscillator();
+                const gain = state.audioCtx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(100, state.audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(0.01, state.audioCtx.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.2, state.audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0, state.audioCtx.currentTime + 0.3);
+                osc.connect(gain); gain.connect(state.audioCtx.destination);
+                osc.start(); osc.stop(state.audioCtx.currentTime + 0.3);
+            }
+
+            tile.innerHTML = '';
+        }
+
+        function gravityEngine() {
+            const tiles = document.querySelectorAll('.tile');
+            for(let i=55; i>=0; i--) {
+                if(tiles[i+8].innerHTML === '') {
+                    tiles[i+8].innerHTML = tiles[i].innerHTML;
+                    tiles[i].innerHTML = '';
+                }
+            }
+            for(let i=0; i<8; i++) {
+                if(tiles[i].innerHTML === '') {
+                    tiles[i].innerHTML = fruits[Math.floor(Math.random() * fruits.length)];
+                }
+            }
+            checkMatches();
+        }
+
+        setInterval(() => {
+            if(document.getElementById('scr-game').classList.contains('active')) {
+                gravityEngine();
+            }
+        }, 150);
+
+        function winLevel() {
+            if(state.lvl === state.unlocked) {
+                state.unlocked++;
+                localStorage.setItem('neon_pro_lvl', state.unlocked);
+            }
+            document.getElementById('mod-win').style.display = 'flex';
+        }
+
+        function closeWinModal() {
+            document.getElementById('mod-win').style.display = 'none';
+            showScr('scr-levels');
+            renderMap();
+        }
+
+        function showResetModal() { document.getElementById('mod-reset').style.display = 'flex'; }
+        function hideResetModal() { document.getElementById('mod-reset').style.display = 'none'; }
+        function confirmReset() {
+            localStorage.removeItem('neon_pro_lvl');
+            state.unlocked = 1;
+            hideResetModal();
+            renderMap();
+        }
+    </script>
+</body>
+</html>
